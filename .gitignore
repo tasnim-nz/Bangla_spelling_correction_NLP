@@ -51,6 +51,13 @@ venv.bak/
 *.bin
 *.h5
 
+# Keep NLP dataset files
+!data/
+!data/raw/
+!data/processed/
+!data/raw/*.txt
+!data/processed/*.txt
+
 # But keep example/config files
 !requirements.txt
 !config.py
