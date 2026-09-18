@@ -1,219 +1,228 @@
-# বানানরীতি (Bananriti)
+# বানানরীতি (BANANRITI)
 
-**Bangla Spelling Error Correction System**
+**A Comparative Study of Noisy-Channel and BanglaT5 Models for Bangla Spelling Correction**
 
-A comparative study of classical Noisy-Channel Model vs. modern Transformer-based (BanglaT5) approaches for Bangla spelling error correction.
+BANANRITI is an NLP project that compares a classical probabilistic spell checker with a transformer-based BanglaT5 model using a synthetic Bangla spelling correction dataset created from Bangla news text.
 
-## 📋 Project Overview
+## Project Overview
 
-This project implements and compares two distinct approaches for automatic Bangla spelling error correction:
+Bangla spelling correction is challenging because text written in online and informal settings often contains phonetic substitutions, visually similar characters, keyboard errors, incorrect word boundaries, and run-on words. A robust correction system must use both the structure of the language and evidence from observed errors.
 
-1. **Classical Noisy-Channel Model** - Statistical, interpretable, lightweight
-2. **BanglaT5 Transformer Model** - Neural, context-aware, data-hungry
+This project compares two approaches:
 
-### Course Information
-- **Course**: Natural Language Processing Laboratory (CSE 4122)
-- **Project Date**: September 2026
-- **Type**: Comparative Implementation Study
+- **Classical Noisy Channel Model:** An interpretable probabilistic system using an n-gram language model, candidate generation, and a learned character-level error model.
+- **BanglaT5 Transformer:** A context-aware sequence-to-sequence model intended for neural spelling correction.
 
-## 🎯 Objectives
+The dataset is built from a Bangla news corpus and transformed into parallel clean-noisy sentence pairs using synthetic error patterns. This repository currently contains the complete classical noisy-channel pipeline through Phase 4.5. The BanglaT5 implementation is the next major stage of the project.
 
-- Develop synthetic Bangla spelling error generator
-- Implement classical noisy-channel spelling corrector
-- Fine-tune BanglaT5 for spelling correction
-- Systematically compare both approaches
-- Understand trade-offs: accuracy vs. efficiency
+## Repository Structure
 
-## 📂 Project Structure
-
-```
-Bananriti/
-├── 1_Data_Preprocessing/          # Corpus collection & cleaning
-│   ├── outputs/                   # Clean corpus, train/val/test splits
-│   ├── download_corpus.py
-│   ├── preprocess.py
-│   └── split_corpus.py
+```text
+Bangla_spelling_correction_NLP/
 │
-├── 2_Error_Generation/            # Synthetic error creation
-│   ├── outputs/                   # Erroneous text, parallel corpus
-│   ├── error_generator.py
-│   └── error_patterns.py
-│
-├── 3_Noisy_Channel_Model/        # Classical approach
-│   ├── outputs/                   # Saved models, predictions
-│   ├── build_nc_model.py
-│   ├── ngram_lm.py
-│   ├── error_model.py
-│   ├── candidate_generator.py
-│   └── inference_nc.py
-│
-├── 4_BanglaT5_Model/             # Transformer approach
-│   ├── configs/                   # Training configurations
-│   ├── outputs/                   # Fine-tuned model, logs
-│   ├── prepare_data.py
-│   ├── fine_tune.py
-│   └── inference_t5.py
-│
-├── 5_Evaluation/                  # Comparison & analysis
-│   ├── outputs/                   # Results, visualizations
-│   ├── evaluate.py
-│   ├── compare_models.py
-│   ├── error_analysis.py
-│   └── visualize_results.py
-│
-├── resources/                     # Dictionaries, mappings
-│   ├── keyboard_maps/            # Avro, Bijoy layouts
-│   ├── bangla_dictionary.txt
-│   ├── phonetic_map.json
-│   └── visual_map.json
-│
-├── utils/                         # Shared utilities
-│   ├── bangla_utils.py
-│   ├── metrics.py
-│   ├── io_utils.py
-│   └── visualization.py
-│
-├── requirements.txt               # Python dependencies
-├── setup_environment.bat          # Windows setup script
-├── setup_environment.sh           # Unix setup script
-└── README.md                      # This file
+├── 1_Data_Preprocessing/
+├── 2_Error_Generation/
+├── 3_Noisy_Channel_Model/
+├── 4_BanglaT5_Model/
+├── 5_Evaluation/
+├── data/
+│   ├── raw/
+│   ├── processed/
+│   ├── splits/
+│   └── noisy/
+├── resources/
+├── models/
+├── outputs/
+├── requirements.txt
+└── README.md
 ```
 
-## 🚀 Quick Start
+- `1_Data_Preprocessing/`: Collects, cleans, normalizes, and splits the Bangla corpus.
+- `2_Error_Generation/`: Generates synthetic spelling errors and parallel clean-noisy data.
+- `3_Noisy_Channel_Model/`: Contains the language model, error model, candidate generator, and inference engine.
+- `4_BanglaT5_Model/`: Reserved for BanglaT5 data preparation, fine-tuning, and inference.
+- `5_Evaluation/`: Evaluates model predictions and stores metrics and error-type results.
+- `data/`: Stores raw, processed, split, and noisy datasets.
+- `resources/`: Stores the dictionary and phonetic, visual, keyboard, and vocabulary resources.
+- `models/`: Stores trained statistical model artifacts.
+- `outputs/`: Stores predictions, metrics, and other experiment outputs.
 
-### Prerequisites
+## Completed Pipeline (Phase 1-4.5)
 
-- Python 3.8 or higher
-- pip package manager
-- 8GB+ RAM (16GB+ recommended for BanglaT5)
-- GPU with CUDA (optional but recommended for BanglaT5)
+| Phase | Description | Status |
+|---|---|---|
+| Corpus Collection | Collect Bangla news text for the project corpus. | Completed |
+| Preprocessing | Clean, normalize, and prepare the corpus. | Completed |
+| Vocabulary Building | Build the Bangla vocabulary and frequency resources. | Completed |
+| Dataset Split | Create training, validation, and test corpus splits. | Completed |
+| Synthetic Error Generation | Generate clean-noisy sentence pairs across five error categories. | Completed |
+| N-gram Language Model | Build smoothed unigram and bigram language models. | Completed |
+| Candidate Generation | Generate spelling candidates using edit and confusion resources. | Completed |
+| Error Model | Learn character confusion probabilities from synthetic pairs. | Completed |
+| Noisy Channel Inference | Decode corrections with confidence, punctuation, split, and run-on handling. | Completed |
+| Evaluation | Evaluate the classical model on the held-out test set. | Completed |
 
-### Installation
+## Dataset Summary
 
-**On Windows:**
+| Item | Value |
+|---|---:|
+| Raw corpus sentences | 10,000 |
+| Clean corpus sentences | 9,812 |
+| Train sentences | 6,868 |
+| Validation sentences | 981 |
+| Test sentences | 1,963 |
+| Total noisy-clean pairs | 49,060 |
+| Vocabulary size | 16,069 |
+
+The noisy dataset contains five synthetic error categories: phonetic, visual, keyboard, split, and run-on errors.
+
+## Synthetic Error Types
+
+| Error Type | Description | Example |
+|---|---|---|
+| Phonetic | Similar pronunciation | বাংলাদেস → বাংলাদেশ |
+| Visual | Similar-looking letters | ভাংলাদেশ → বাংলাদেশ |
+| Keyboard | Neighboring keyboard characters | লাইণে → লাইনে |
+| Split | Incorrect word split | বাংলা দেশ → বাংলাদেশ |
+| Run-on | Missing space | বাংলাদেশসরকার → বাংলাদেশ সরকার |
+
+## Classical Noisy Channel Model
+
+### Language Model
+
+- Unigram counts estimate individual word probabilities.
+- Bigram counts model local word context.
+- Laplace smoothing assigns non-zero probabilities to unseen words and word pairs.
+
+### Candidate Generator
+
+Candidates are generated using:
+
+- Edit Distance 1
+- Edit Distance 2
+- Phonetic confusion map
+- Visual confusion map
+- Keyboard confusion map
+
+### Error Model
+
+The error model estimates character confusion probabilities learned from synthetic noisy-clean sentence pairs.
+
+### Inference
+
+The inference engine performs noisy-channel decoding and includes:
+
+- A confidence threshold for conservative correction.
+- Dictionary preservation for already-correct words.
+- Punctuation preservation for attached punctuation.
+- Split-error handling for concatenated dictionary words.
+- Run-on handling for adjacent tokens that form a dictionary word.
+
+## Baseline Evaluation Results
+
+| Metric | Result |
+|---|---:|
+| Test sentence pairs | 9,815 |
+| Sentence Accuracy | **37.39%** |
+| Word Accuracy | **86.79%** |
+| Correction Accuracy | **66.12%** |
+
+### Error-Type Accuracy
+
+| Error Type | Accuracy |
+|---|---:|
+| Phonetic | 15.35% |
+| Visual | 17.06% |
+| Keyboard | 10.85% |
+| Split | 80.89% |
+| Run-on | 62.49% |
+
+These results serve as the classical baseline for comparison with BanglaT5.
+
+## How to Run
+
+### Step 1: Create a Virtual Environment
+
 ```bash
-setup_environment.bat
-```
-
-**On Mac/Linux:**
-```bash
-chmod +x setup_environment.sh
-./setup_environment.sh
-```
-
-**Manual Setup:**
-```bash
-# Create virtual environment
 python -m venv venv
+```
 
-# Activate it
-# Windows:
+Activate the environment before continuing.
+
+On Windows:
+
+```powershell
 venv\Scripts\activate
-# Mac/Linux:
+```
+
+On macOS or Linux:
+
+```bash
 source venv/bin/activate
+```
 
-# Install dependencies
+### Step 2: Install Requirements
+
+```bash
 pip install -r requirements.txt
-
-# Download NLTK data
-python -c "import nltk; nltk.download('punkt'); nltk.download('averaged_perceptron_tagger')"
 ```
 
-## 📊 Implementation Phases
+### Step 3: Run Preprocessing
 
-### Phase 1: Data Preprocessing
 ```bash
-cd 1_Data_Preprocessing
-python download_corpus.py    # Download Bangla corpus
-python preprocess.py          # Clean and normalize
-python split_corpus.py        # Train/val/test split
+python 1_Data_Preprocessing/download_corpus.py
+python 1_Data_Preprocessing/preprocess.py
+python 1_Data_Preprocessing/build_vocabulary.py
+python 1_Data_Preprocessing/split_corpus.py
 ```
 
-### Phase 2: Error Generation
+### Step 4: Generate the Noisy Dataset
+
 ```bash
-cd 2_Error_Generation
-python error_generator.py     # Generate synthetic errors
+python 2_Error_Generation/error_generator.py
 ```
 
-### Phase 3: Noisy-Channel Model
+### Step 5: Build the Classical Model
+
 ```bash
-cd 3_Noisy_Channel_Model
-python build_nc_model.py      # Train classical model
-python inference_nc.py        # Test predictions
+python 3_Noisy_Channel_Model/ngram_lm.py
+python 3_Noisy_Channel_Model/error_model.py
 ```
 
-### Phase 4: BanglaT5 Model
+### Step 6: Run Inference
+
 ```bash
-cd 4_BanglaT5_Model
-python prepare_data.py        # Format for HuggingFace
-python fine_tune.py           # Fine-tune BanglaT5
-python inference_t5.py        # Test predictions
+python 3_Noisy_Channel_Model/inference_nc.py
 ```
 
-### Phase 5: Evaluation
+### Step 7: Evaluate
+
 ```bash
-cd 5_Evaluation
-python evaluate.py            # Calculate metrics
-python compare_models.py      # Comparative analysis
-python visualize_results.py   # Generate charts
+python 5_Evaluation/evaluate_noisy_channel.py
 ```
 
-## 🔍 Bangla Error Types
+## Current Progress
 
-The system handles five main error categories:
+- Phase 1 Complete
+- Phase 2 Complete
+- Phase 3 Complete
+- Phase 4 Complete
+- Phase 4.5 Evaluation Complete
+- Phase 5 BanglaT5 Fine-tuning
+- Phase 6 Model Comparison
+- Phase 7 Final Report & Presentation
 
-1. **Phonetic Errors** - Similar sounding characters (ড↔ঢ, ত↔ট)
-2. **Visual Errors** - Visually similar characters (ব↔য়)
-3. **Typographical Errors** - Insertion, deletion, substitution, transposition
-4. **Split-Word Errors** - Incorrect word spacing
-5. **Run-on Errors** - Multiple words joined together
+## Future Work
 
-## 📈 Expected Results
+- Fine-tune BanglaT5.
+- Compare BanglaT5 against the Noisy Channel baseline.
+- Analyze correction quality by error type.
+- Prepare IEEE-style experimental results.
 
-### Noisy-Channel Model
-- Exact Match: 65-75%
-- Character Error Rate: 3-8%
-- Word-level F1: 70-80%
-- Inference: <100ms per sentence (CPU)
+## Contributors
 
-### BanglaT5 Model
-- Exact Match: 75-85%
-- Character Error Rate: 2-6%
-- Word-level F1: 78-88%
-- Inference: 50-200ms per sentence (GPU)
-
-## 🛠️ Technologies
-
-- **PyTorch** - Deep learning framework
-- **Transformers (Hugging Face)** - BanglaT5 model
-- **NLTK** - Text processing utilities
-- **NumPy/Pandas** - Data manipulation
-- **Matplotlib/Seaborn** - Visualization
-
-## 📚 References
-
-1. Kernighan, M. D., Church, K. W., & Gale, W. A. (1990). A Spelling Correction Program Based on a Noisy Channel Model. COLING 1990.
-
-2. Bhattacharjee, A., Hasan, T., Ahmad, W. U., & Shahriyar, R. (2023). BanglaNLG and BanglaT5. EACL 2023. arXiv:2205.11081
-
-3. Bijoy, M. H., Hossain, N., Islam, S., & Shatabda, S. (2025). A Transformer-Based Spelling Error Correction Framework for Bangla. Computer Speech & Language, 89, 101703.
-
-## 🤝 Contributing
-
-This is an academic project for CSE 4122. For questions or suggestions, please refer to the course instructor.
-
-## 📄 License
-
-Academic use only. See course guidelines for usage terms.
-
-## 🎓 Acknowledgments
-
-- Course: Natural Language Processing Laboratory (CSE 4122)
-- Pretrained models from Hugging Face
-- Bangla NLP community resources
-
----
-
-**Created**: September 2026  
-**Status**: Phase 0 Complete - Project structure initialized  
-**Next Step**: Phase 1 - Data Preprocessing
+| Contributor | GitHub Username |
+|---|---|
+| Contributor 1 | `@username1` |
+| Contributor 2 | `@username2` |
+| Contributor 3 | `@username3` |
