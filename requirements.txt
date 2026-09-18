@@ -1,0 +1,27 @@
+# Core PyTorch and Deep Learning
+# torch, torchvision, torchaudio already installed separately via:
+# pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+
+# Hugging Face Transformers
+transformers>=4.35.0
+datasets>=2.14.0
+accelerate>=0.25.0
+tokenizers>=0.14.0
+
+# Data Processing & Numerical Computing
+numpy>=1.26.0
+pandas>=2.1.0
+scipy>=1.11.0
+
+# NLP Utilities
+nltk>=3.8.1
+scikit-learn>=1.3.0
+
+# Visualization
+matplotlib>=3.7.2
+seaborn>=0.12.2
+
+# Utilities
+tqdm>=4.66.1
+python-dotenv>=1.0.0
+pyyaml>=6.0
