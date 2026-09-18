@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import difflib
 import math
 import re
 import sys
@@ -62,44 +63,30 @@ def language_model_score(candidate: str, previous_word: str | None = None) -> fl
 
 
 def error_model_score(clean_word: str, noisy_word: str) -> float:
-    """Return log P(noisy_word | clean_word) from observed substitutions.
-
-    Only index-aligned substitutions are used in this phase.  Extra or missing
-    characters are ignored, as insertion/deletion statistics are not modeled.
-    """
-    clean_start = noisy_start = 0
-    while (
-        clean_start < len(clean_word)
-        and noisy_start < len(noisy_word)
-        and clean_word[clean_start] == noisy_word[noisy_start]
-    ):
-        clean_start += 1
-        noisy_start += 1
-
-    clean_end, noisy_end = len(clean_word), len(noisy_word)
-    while (
-        clean_end > clean_start
-        and noisy_end > noisy_start
-        and clean_word[clean_end - 1] == noisy_word[noisy_end - 1]
-    ):
-        clean_end -= 1
-        noisy_end -= 1
-
-    clean_change = clean_word[clean_start:clean_end]
-    noisy_change = noisy_word[noisy_start:noisy_end]
-    # A different-sized middle span is an insertion/deletion (or a conjunct
-    # expansion).  It has no model in this phase, so it contributes no penalty.
-    if len(clean_change) != len(noisy_change):
-        return 0.0
-
-    probability = 1.0
-    for clean_character, noisy_character in zip(clean_change, noisy_change):
-        if clean_character != noisy_character:
-            probability *= CONFUSION_PROBABILITIES.get(clean_character, {}).get(
-                noisy_character,
-                SMOOTHING_PROBABILITY,
+    """Return log P(noisy_word | clean_word) from an edit alignment."""
+    score = 0.0
+    matcher = difflib.SequenceMatcher(None, clean_word, noisy_word)
+    for operation, clean_start, clean_end, noisy_start, noisy_end in matcher.get_opcodes():
+        if operation == "equal":
+            continue
+        if operation == "replace":
+            replacement_probabilities = [
+                CONFUSION_PROBABILITIES.get(clean_character, {}).get(
+                    noisy_character,
+                    0.0,
+                )
+                for clean_character, noisy_character in zip(
+                clean_word[clean_start:clean_end],
+                noisy_word[noisy_start:noisy_end],
+                )
+            ]
+            score += math.log(max(replacement_probabilities, default=0.0) or 1e-6)
+        elif operation in {"insert", "delete"}:
+            score += math.log(1e-4) * max(
+                noisy_end - noisy_start,
+                clean_end - clean_start,
             )
-    return math.log(probability)
+    return score
 
 
 def noisy_channel_score(
@@ -187,23 +174,68 @@ def _split_attached_punctuation(token: str) -> tuple[str, str, str]:
     return token[:start], token[start:end], token[end:]
 
 
+def _dictionary_split(word: str) -> tuple[str, str] | None:
+    """Return a two-word dictionary split when one exists."""
+    if len(word) < 10:
+        return None
+    for split_at in range(1, len(word)):
+        first, second = word[:split_at], word[split_at:]
+        if first in DICTIONARY and second in DICTIONARY:
+            return first, second
+    return None
+
+
 def correct_sentence(sentence: str) -> str:
     """Correct whitespace-separated Bangla words while preserving punctuation."""
     previous_word: str | None = None
     corrected_parts: list[str] = []
+    parts = re.split(r"(\s+)", sentence)
+    word_parts = [
+        (index, _split_attached_punctuation(part))
+        for index, part in enumerate(parts)
+        if part and not part.isspace()
+    ]
+    word_index = 0
 
-    for part in re.split(r"(\s+)", sentence):
+    part_index = 0
+    while part_index < len(parts):
+        part = parts[part_index]
         if not part or part.isspace():
             corrected_parts.append(part)
+            part_index += 1
             continue
 
         prefix, noisy_word, suffix = _split_attached_punctuation(part)
         if noisy_word:
-            corrected_word, _ = correct_word(noisy_word, previous_word)
-            corrected_parts.append(prefix + corrected_word + suffix)
-            previous_word = corrected_word
+            split_words = _dictionary_split(noisy_word) if noisy_word not in DICTIONARY else None
+            if split_words:
+                corrected_parts.append(
+                    prefix + split_words[0] + " " + split_words[1] + suffix
+                )
+                previous_word = split_words[1]
+            else:
+                next_word = None
+                if part_index + 2 < len(parts) and parts[part_index + 1].isspace():
+                    next_prefix, next_word, next_suffix = _split_attached_punctuation(
+                        parts[part_index + 2]
+                    )
+                    if (
+                        not suffix
+                        and not next_prefix
+                        and not next_suffix
+                        and noisy_word + next_word in DICTIONARY
+                    ):
+                        corrected_parts.append(prefix + noisy_word + next_word)
+                        previous_word = noisy_word + next_word
+                        part_index += 2
+                        part_index += 1
+                        continue
+                corrected_word, _ = correct_word(noisy_word, previous_word)
+                corrected_parts.append(prefix + corrected_word + suffix)
+                previous_word = corrected_word
         else:
             corrected_parts.append(part)
+        part_index += 1
 
     return "".join(corrected_parts)
 
