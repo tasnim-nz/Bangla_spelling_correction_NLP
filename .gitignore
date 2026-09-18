@@ -73,7 +73,12 @@ venv.bak/
 
 # Outputs (large model files and results)
 outputs/
-models/
+# Ignore model checkpoints only
+checkpoints/
+
+# Keep Noisy Channel language model artifacts
+!models/
+!models/*.json
 checkpoints/
 
 # Logs
