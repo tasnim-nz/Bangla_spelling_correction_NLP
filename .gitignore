@@ -57,6 +57,9 @@ venv.bak/
 !data/processed/
 !data/raw/*.txt
 !data/processed/*.txt
+!data/splits/*.txt
+!resources/*.txt
+!resources/*.csv
 
 # But keep example/config files
 !requirements.txt

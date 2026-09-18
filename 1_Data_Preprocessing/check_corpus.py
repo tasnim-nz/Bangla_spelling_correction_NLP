@@ -3,24 +3,43 @@ Inspect the collected Bangla corpus without modifying it.
 """
 
 from pathlib import Path
+import argparse
 import random
 import re
 
 
-CORPUS_FILENAME = "raw_corpus.txt"
+CORPUS_FILES = {
+    "raw": Path("data/raw/raw_corpus.txt"),
+    "processed": Path("data/processed/clean_corpus.txt"),
+}
 LATIN_LETTER_PATTERN = re.compile(r"[A-Za-z]")
 URL_PATTERN = re.compile(r"(?:https?://|www\.)", re.IGNORECASE)
 BANGLA_CHARACTER_PATTERN = re.compile(r"[\u0980-\u09FF]")
 BANGLA_DIGIT_PATTERN = re.compile(r"[0-9০-৯]")
 
 
-def find_corpus_file():
+def parse_arguments():
+    """Read the optional corpus type from the command line."""
+
+    parser = argparse.ArgumentParser(description="Print a Bangla corpus quality report.")
+    parser.add_argument(
+        "corpus_type",
+        nargs="?",
+        choices=CORPUS_FILES,
+        default="raw",
+        help="Corpus to analyze: raw (default) or processed.",
+    )
+    return parser.parse_args()
+
+
+def find_corpus_file(corpus_type):
     """Return the corpus path for common project launch locations."""
 
     script_directory = Path(__file__).resolve().parent
+    corpus_path = CORPUS_FILES[corpus_type]
     candidate_paths = [
-        Path("data/raw") / CORPUS_FILENAME,
-        script_directory.parent / "data/raw" / CORPUS_FILENAME,
+        corpus_path,
+        script_directory.parent / corpus_path,
     ]
 
     for path in candidate_paths:
@@ -101,8 +120,10 @@ def print_sentence_group(title, sentences):
 def main():
     """Load the corpus and print its quality report."""
 
+    arguments = parse_arguments()
+
     try:
-        corpus_path = find_corpus_file()
+        corpus_path = find_corpus_file(arguments.corpus_type)
     except FileNotFoundError as error:
         print(error)
         return

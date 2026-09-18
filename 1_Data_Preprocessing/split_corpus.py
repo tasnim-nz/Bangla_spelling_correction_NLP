@@ -1,168 +1,146 @@
 """
-Phase 1: Data Preprocessing - Step 2
-Split corpus into train/validation/test sets
-
-This script:
-1. Loads clean corpus
-2. Shuffles sentences
-3. Splits into train (70%), validation (10%), test (20%)
-4. Saves each split separately
-5. Generates split statistics
+Phase 2.3: Split the clean Bangla corpus into train, validation, and test sets.
 """
 
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
+from pathlib import Path
 import random
-from utils.io_utils import read_lines, write_lines, write_json
-from utils.bangla_utils import tokenize_bangla_words
 
 
-def split_corpus(clean_corpus_file, output_dir, train_ratio=0.7, val_ratio=0.1, test_ratio=0.2, seed=42):
-    """
-    Split corpus into train/val/test sets
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+INPUT_FILE = PROJECT_ROOT / "data/processed/clean_corpus.txt"
+OUTPUT_DIRECTORY = PROJECT_ROOT / "data/splits"
+TRAIN_FILE = OUTPUT_DIRECTORY / "train_set.txt"
+VALIDATION_FILE = OUTPUT_DIRECTORY / "validation_set.txt"
+TEST_FILE = OUTPUT_DIRECTORY / "test_set.txt"
 
-    Args:
-        clean_corpus_file (str): Path to clean corpus
-        output_dir (str): Output directory
-        train_ratio (float): Training set ratio
-        val_ratio (float): Validation set ratio
-        test_ratio (float): Test set ratio
-        seed (int): Random seed for reproducibility
-    """
-    print("\n" + "="*70)
-    print("PHASE 1: CORPUS SPLITTING")
-    print("="*70)
+TRAIN_RATIO = 0.70
+VALIDATION_RATIO = 0.10
+RANDOM_SEED = 42
 
-    # Validate ratios
-    assert abs(train_ratio + val_ratio + test_ratio - 1.0) < 0.001, "Ratios must sum to 1.0"
 
-    # Step 1: Load clean corpus
-    print("\n[1/5] Loading clean corpus...")
-    sentences = read_lines(clean_corpus_file)
-    print(f"✓ Loaded {len(sentences)} sentences")
+def read_sentences(input_file):
+    """Read the corpus as one sentence per line without altering sentence text."""
 
-    # Step 2: Shuffle sentences
-    print("\n[2/5] Shuffling sentences...")
-    random.seed(seed)
-    random.shuffle(sentences)
-    print(f"✓ Sentences shuffled (seed={seed})")
+    return input_file.read_text(encoding="utf-8").splitlines()
 
-    # Step 3: Calculate split sizes
-    print("\n[3/5] Calculating split sizes...")
-    total = len(sentences)
-    train_size = int(total * train_ratio)
-    val_size = int(total * val_ratio)
-    test_size = total - train_size - val_size  # Remaining goes to test
 
-    print(f"✓ Train: {train_size} sentences ({train_ratio*100:.0f}%)")
-    print(f"✓ Validation: {val_size} sentences ({val_ratio*100:.0f}%)")
-    print(f"✓ Test: {test_size} sentences ({test_ratio*100:.0f}%)")
+def split_sentences(sentences):
+    """Shuffle once with seed 42 and return 70/10/20 corpus splits."""
 
-    # Step 4: Split data
-    print("\n[4/5] Creating splits...")
-    train_data = sentences[:train_size]
-    val_data = sentences[train_size:train_size + val_size]
-    test_data = sentences[train_size + val_size:]
+    shuffled_sentences = list(sentences)
+    random.seed(RANDOM_SEED)
+    random.shuffle(shuffled_sentences)
 
-    # Verify split
-    assert len(train_data) + len(val_data) + len(test_data) == total
-    print(f"✓ Split verification passed")
+    total_sentences = len(shuffled_sentences)
+    train_count = int(total_sentences * TRAIN_RATIO)
+    validation_count = int(total_sentences * VALIDATION_RATIO)
 
-    # Step 5: Save splits
-    print("\n[5/5] Saving splits...")
-    os.makedirs(output_dir, exist_ok=True)
+    train_sentences = shuffled_sentences[:train_count]
+    validation_sentences = shuffled_sentences[
+        train_count:train_count + validation_count
+    ]
+    test_sentences = shuffled_sentences[train_count + validation_count:]
 
-    # Save train set
-    train_file = os.path.join(output_dir, "train_corpus.txt")
-    write_lines(train_file, train_data)
-    print(f"✓ Saved: {train_file}")
+    return train_sentences, validation_sentences, test_sentences
 
-    # Save validation set
-    val_file = os.path.join(output_dir, "val_corpus.txt")
-    write_lines(val_file, val_data)
-    print(f"✓ Saved: {val_file}")
 
-    # Save test set
-    test_file = os.path.join(output_dir, "test_corpus.txt")
-    write_lines(test_file, test_data)
-    print(f"✓ Saved: {test_file}")
+def verify_splits(input_count, train_sentences, validation_sentences, test_sentences):
+    """Check split counts and sentence overlap between every pair of splits."""
 
-    # Calculate statistics for each split
-    print("\n" + "-"*70)
-    print("SPLIT STATISTICS")
-    print("-"*70)
+    train_set = set(train_sentences)
+    validation_set = set(validation_sentences)
+    test_set = set(test_sentences)
 
-    splits = {
-        "train": train_data,
-        "validation": val_data,
-        "test": test_data
+    overlaps = {
+        "train_validation": bool(train_set & validation_set),
+        "train_test": bool(train_set & test_set),
+        "validation_test": bool(validation_set & test_set),
     }
 
-    split_stats = {}
-
-    for split_name, split_data in splits.items():
-        total_words = sum(len(tokenize_bangla_words(s)) for s in split_data)
-        avg_words = total_words / len(split_data) if split_data else 0
-
-        stats = {
-            "sentences": len(split_data),
-            "total_words": total_words,
-            "avg_words_per_sentence": round(avg_words, 2)
-        }
-
-        split_stats[split_name] = stats
-
-        print(f"\n{split_name.upper()}:")
-        print(f"  Sentences: {stats['sentences']:,}")
-        print(f"  Total words: {stats['total_words']:,}")
-        print(f"  Avg words/sentence: {stats['avg_words_per_sentence']}")
-
-    # Save split statistics
-    stats_file = os.path.join(output_dir, "split_stats.json")
-    split_info = {
-        "total_sentences": total,
-        "train_ratio": train_ratio,
-        "val_ratio": val_ratio,
-        "test_ratio": test_ratio,
-        "random_seed": seed,
-        "splits": split_stats
+    return {
+        "total_matches_input": (
+            len(train_sentences) + len(validation_sentences) + len(test_sentences)
+            == input_count
+        ),
+        "overlap_exists": any(overlaps.values()),
+        "pairwise_overlaps": overlaps,
     }
-    write_json(stats_file, split_info)
-    print(f"\n✓ Saved statistics: {stats_file}")
 
-    print("\n" + "="*70)
-    print("✓ CORPUS SPLITTING COMPLETE")
-    print("="*70)
-    print(f"\nData split into:")
-    print(f"  • Train: {train_size} sentences")
-    print(f"  • Validation: {val_size} sentences")
-    print(f"  • Test: {test_size} sentences")
-    print(f"\nReady for language model training\n")
 
-    return train_data, val_data, test_data, split_stats
+def save_split(sentences, output_file):
+    """Save one UTF-8 sentence per line without changing sentence content."""
+
+    content = "\n".join(sentences)
+    if content:
+        content += "\n"
+
+    output_file.write_text(content, encoding="utf-8")
+
+
+def print_summary(input_count, train_sentences, validation_sentences, test_sentences, verification):
+    """Print split counts and verification results."""
+
+    total_after_split = (
+        len(train_sentences) + len(validation_sentences) + len(test_sentences)
+    )
+
+    print("\n" + "=" * 56)
+    print("CORPUS SPLIT SUMMARY")
+    print("=" * 56)
+    print(f"Input sentence count: {input_count:,}")
+    print(f"Train count: {len(train_sentences):,}")
+    print(f"Validation count: {len(validation_sentences):,}")
+    print(f"Test count: {len(test_sentences):,}")
+    print(f"Total after split: {total_after_split:,}")
+    print(
+        "Total matches input: "
+        f"{'PASS' if verification['total_matches_input'] else 'FAIL'}"
+    )
+    print(
+        "Overlap check result: "
+        f"{'NO OVERLAP' if not verification['overlap_exists'] else 'OVERLAP FOUND'}"
+    )
+    print(f"Output directory path: {OUTPUT_DIRECTORY}")
+
+
+def main():
+    """Read, split, verify, save, and report the clean corpus splits."""
+
+    if not INPUT_FILE.is_file():
+        print(f"Clean corpus not found: {INPUT_FILE}")
+        return
+
+    sentences = read_sentences(INPUT_FILE)
+    train_sentences, validation_sentences, test_sentences = split_sentences(sentences)
+    verification = verify_splits(
+        len(sentences),
+        train_sentences,
+        validation_sentences,
+        test_sentences,
+    )
+
+    if not verification["total_matches_input"] or verification["overlap_exists"]:
+        print_summary(
+            len(sentences),
+            train_sentences,
+            validation_sentences,
+            test_sentences,
+            verification,
+        )
+        raise RuntimeError("Split verification failed; output files were not written.")
+
+    OUTPUT_DIRECTORY.mkdir(parents=True, exist_ok=True)
+    save_split(train_sentences, TRAIN_FILE)
+    save_split(validation_sentences, VALIDATION_FILE)
+    save_split(test_sentences, TEST_FILE)
+    print_summary(
+        len(sentences),
+        train_sentences,
+        validation_sentences,
+        test_sentences,
+        verification,
+    )
 
 
 if __name__ == "__main__":
-    # Paths
-    clean_corpus_file = "outputs/clean_corpus.txt"
-    output_dir = "outputs"
-
-    # Check if clean corpus exists
-    if not os.path.exists(clean_corpus_file):
-        print("ERROR: clean_corpus.txt not found!")
-        print("Please run preprocess.py first")
-        sys.exit(1)
-
-    # Split corpus
-    train_data, val_data, test_data, stats = split_corpus(
-        clean_corpus_file,
-        output_dir,
-        train_ratio=0.7,
-        val_ratio=0.1,
-        test_ratio=0.2,
-        seed=42
-    )
-
-    print("Next step: Run build_language_model.py to train n-gram LM")
+    main()
