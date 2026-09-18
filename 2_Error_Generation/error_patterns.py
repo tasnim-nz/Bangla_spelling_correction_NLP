@@ -1,225 +1,219 @@
-"""
-Error Patterns for Bangla Spelling Error Generation
-Phase 2: Synthetic Error Generation
+"""Reusable Bangla spelling-error patterns.
 
-Defines Bangla-specific error patterns across 5 categories:
-  1. Phonetic errors   – Similar-sounding character substitutions
-  2. Visual errors     – Similar-looking character substitutions
-  3. Typographical      – Insertion / deletion / substitution / transposition
-  4. Split-word errors  – Incorrect space insertion within a word
-  5. Run-on errors      – Removing space between consecutive words
-
-Each map is bidirectional where applicable.
+This module deliberately contains only sentence-level error logic. The three
+character-confusion maps are loaded once at import time; dataset generation and
+file handling belong elsewhere in the project.
 """
 
+from __future__ import annotations
+
+import json
+import random
 import sys
-import os
-
-# Add project root to path for imports
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-from config import (
-    BANGLA_VOWELS, BANGLA_CONSONANTS, BANGLA_DIACRITICS,
-    ERROR_TYPES, ERROR_DISTRIBUTION
-)
-
-# ============================================================================
-# 1. PHONETIC SIMILARITY MAP (expanded)
-# ============================================================================
-# Characters that sound alike in spoken Bangla.
-# Each key maps to a list of phonetically confusable alternatives.
-
-PHONETIC_MAP = {
-    # Dental vs Retroflex stops
-    'ত': ['ট'],
-    'ট': ['ত'],
-    'থ': ['ঠ'],
-    'ঠ': ['থ'],
-    'দ': ['ড'],
-    'ড': ['দ'],
-    'ধ': ['ঢ'],
-    'ঢ': ['ধ'],
-    'ন': ['ণ'],
-    'ণ': ['ন'],
-
-    # Sibilants
-    'শ': ['ষ', 'স'],
-    'ষ': ['শ', 'স'],
-    'স': ['শ', 'ষ'],
-
-    # Affricates / Nasals
-    'জ': ['য'],
-    'য': ['জ'],
-    'ঞ': ['ন'],
-
-    # Aspirated pairs that get confused in fast speech
-    'ক': ['খ'],
-    'খ': ['ক'],
-    'গ': ['ঘ'],
-    'ঘ': ['গ'],
-    'চ': ['ছ'],
-    'ছ': ['চ'],
-    'প': ['ফ'],
-    'ফ': ['প'],
-    'ব': ['ভ'],
-    'ভ': ['ব'],
-
-    # Flap consonants
-    'ড়': ['র'],
-    'র': ['ড়'],
-    'ঢ়': ['ড়'],
-}
-
-# ============================================================================
-# 2. VISUAL SIMILARITY MAP (expanded)
-# ============================================================================
-# Characters that look alike in common Bangla fonts.
-
-VISUAL_MAP = {
-    'ব': ['ব', 'য়'],
-    'য়': ['ব'],
-    'ঠ': ['ব'],
-    'ক': ['খ'],
-    'খ': ['ক'],
-    'ত': ['থ'],
-    'থ': ['ত'],
-    'ড': ['ড়'],
-    'ড়': ['ড'],
-    'ঢ': ['ঢ়'],
-    'ঢ়': ['ঢ'],
-    'ঙ': ['ঞ'],
-    'ঞ': ['ঙ'],
-
-    # Vowel signs (diacritics) that look similar in small sizes
-    'ি': ['ী'],
-    'ী': ['ি'],
-    'ু': ['ূ'],
-    'ূ': ['ু'],
-    'ে': ['ৈ'],
-    'ৈ': ['ে'],
-    'ো': ['ৌ'],
-    'ৌ': ['ো'],
-}
-
-# ============================================================================
-# 3. NEARBY KEYS MAP (for typographical substitution)
-# ============================================================================
-# Approximation of a standard Bangla (Avro/Probhat) keyboard layout.
-# Maps each character to neighbours that could result from a mis-keystroke.
-
-KEYBOARD_NEIGHBOURS = {
-    'ক': ['খ', 'গ'],
-    'খ': ['ক', 'ঘ'],
-    'গ': ['ক', 'ঘ', 'ঙ'],
-    'ঘ': ['গ', 'ঙ'],
-    'ঙ': ['ঘ'],
-    'চ': ['ছ', 'জ'],
-    'ছ': ['চ', 'জ'],
-    'জ': ['ছ', 'ঝ'],
-    'ঝ': ['জ', 'ঞ'],
-    'ঞ': ['ঝ'],
-    'ট': ['ঠ', 'ড'],
-    'ঠ': ['ট', 'ড'],
-    'ড': ['ট', 'ঠ', 'ঢ'],
-    'ঢ': ['ড', 'ণ'],
-    'ণ': ['ঢ', 'ত'],
-    'ত': ['ণ', 'থ'],
-    'থ': ['ত', 'দ'],
-    'দ': ['থ', 'ধ'],
-    'ধ': ['দ', 'ন'],
-    'ন': ['ধ', 'প'],
-    'প': ['ন', 'ফ'],
-    'ফ': ['প', 'ব'],
-    'ব': ['ফ', 'ভ'],
-    'ভ': ['ব', 'ম'],
-    'ম': ['ভ', 'য'],
-    'য': ['ম', 'র'],
-    'র': ['য', 'ল'],
-    'ল': ['র', 'শ'],
-    'শ': ['ল', 'ষ'],
-    'ষ': ['শ', 'স'],
-    'স': ['ষ', 'হ'],
-    'হ': ['স'],
-}
-
-# ============================================================================
-# 4. BANGLA CHARACTER POOL (for random insertion / substitution)
-# ============================================================================
-# Union of vowels, consonants, and common diacritics, used when we need a
-# random Bangla character for insertion or wild substitution.
-
-ALL_BANGLA_CHARS = BANGLA_VOWELS + BANGLA_CONSONANTS + BANGLA_DIACRITICS
-
-# ============================================================================
-# 5. ERROR WEIGHTS FOR TYPOGRAPHICAL SUB-OPERATIONS
-# ============================================================================
-# Within the "typographical" category, how we split across sub-operations.
-
-TYPO_SUB_OPERATIONS = {
-    'substitution':  0.30,   # Replace a character with a nearby key
-    'insertion':     0.25,   # Insert an extra character
-    'deletion':      0.25,   # Delete a character
-    'transposition': 0.20,   # Swap two adjacent characters
-}
-
-# ============================================================================
-# 6. ERROR GENERATION CONSTRAINTS
-# ============================================================================
-
-MIN_WORD_LENGTH_FOR_ERROR = 3      # Don't corrupt very short words
-MAX_ERRORS_PER_SENTENCE = 3        # Cap on number of words modified per sentence
-ERROR_RATE_PER_SENTENCE = 0.15     # ~15 % of words in a sentence get an error
-MIN_SPLIT_WORD_LENGTH = 5          # Minimum word length to apply a split error
-RUN_ON_MAX_WORDS = 2               # How many consecutive words to join
+import unicodedata
+from pathlib import Path
+from typing import Mapping, Sequence
 
 
-# ============================================================================
-# CONVENIENCE HELPERS
-# ============================================================================
-
-def get_phonetic_candidates(char):
-    """Return list of phonetically similar characters (or empty list)."""
-    return PHONETIC_MAP.get(char, [])
+_RESOURCE_DIR = Path(__file__).resolve().parent.parent / "resources"
 
 
-def get_visual_candidates(char):
-    """Return list of visually similar characters (or empty list)."""
-    return VISUAL_MAP.get(char, [])
+def _load_map(filename: str) -> dict[str, list[str]]:
+    """Load one project character-confusion map as UTF-8 JSON."""
+    with (_RESOURCE_DIR / filename).open(encoding="utf-8") as resource_file:
+        return json.load(resource_file)
 
 
-def get_keyboard_neighbours(char):
-    """Return list of nearby-keyboard characters (or empty list)."""
-    return KEYBOARD_NEIGHBOURS.get(char, [])
+# Resources are loaded once, rather than on every generated error.
+PHONETIC_MAP = _load_map("phonetic_map.json")
+VISUAL_MAP = _load_map("visual_map.json")
+KEYBOARD_MAP = _load_map("keyboard_map.json")
 
 
-# ============================================================================
-# MODULE SELF-TEST
-# ============================================================================
+def is_bangla_character(character: str) -> bool:
+    """Return whether *character* is a Bangla letter or combining sign.
 
-if __name__ == '__main__':
-    print("=" * 60)
-    print("Error Patterns Module - Self-Test")
-    print("=" * 60)
+    Bangla digits and punctuation are excluded so they cannot be split, merged,
+    or used as replacement positions.
+    """
+    return (
+        len(character) == 1
+        and "\u0980" <= character <= "\u09ff"
+        and unicodedata.category(character)[0] in {"L", "M"}
+    )
 
-    print(f"\nPhonetic map entries : {len(PHONETIC_MAP)}")
-    print(f"Visual map entries   : {len(VISUAL_MAP)}")
-    print(f"Keyboard map entries : {len(KEYBOARD_NEIGHBOURS)}")
-    print(f"Total Bangla chars   : {len(ALL_BANGLA_CHARS)}")
 
-    print("\nSample phonetic pairs:")
-    for ch, alts in list(PHONETIC_MAP.items())[:5]:
-        print(f"  {ch} → {alts}")
+def _is_bangla_word(text: str) -> bool:
+    """Return whether text consists solely of Bangla letters/signs."""
+    return bool(text) and all(is_bangla_character(character) for character in text)
 
-    print("\nSample visual pairs:")
-    for ch, alts in list(VISUAL_MAP.items())[:5]:
-        print(f"  {ch} → {alts}")
 
-    print("\nError distribution:")
-    for etype, weight in ERROR_DISTRIBUTION.items():
-        print(f"  {etype:20s}: {weight:.0%}")
+def _replace_one_mapped_character(
+    sentence: str, character_map: Mapping[str, Sequence[str]]
+) -> str:
+    """Replace one randomly selected position having a usable mapped value."""
+    candidates = []
+    for index, character in enumerate(sentence):
+        replacements = [
+            replacement
+            for replacement in character_map.get(character, [])
+            if replacement != character
+        ]
+        if is_bangla_character(character) and replacements:
+            candidates.append((index, replacements))
 
-    print("\nTypo sub-operations:")
-    for op, w in TYPO_SUB_OPERATIONS.items():
-        print(f"  {op:20s}: {w:.0%}")
+    if not candidates:
+        return sentence
 
-    print("\n✓ error_patterns.py loaded successfully")
+    index, replacements = random.choice(candidates)
+    replacement = random.choice(replacements)
+    return sentence[:index] + replacement + sentence[index + 1:]
+
+
+def phonetic_error(sentence: str) -> str:
+    """Make exactly one phonetic Bangla-character substitution, if possible."""
+    return _replace_one_mapped_character(sentence, PHONETIC_MAP)
+
+
+def visual_error(sentence: str) -> str:
+    """Make exactly one visually similar Bangla-character substitution."""
+    return _replace_one_mapped_character(sentence, VISUAL_MAP)
+
+
+def keyboard_error(sentence: str) -> str:
+    """Make exactly one nearby-key keyboard character/vowel-sign substitution."""
+    return _replace_one_mapped_character(sentence, KEYBOARD_MAP)
+
+
+def _word_spans(sentence: str) -> list[tuple[int, int]]:
+    """Find contiguous Bangla words without treating punctuation as a word."""
+    spans: list[tuple[int, int]] = []
+    start: int | None = None
+    for index, character in enumerate(sentence):
+        if is_bangla_character(character):
+            if start is None:
+                start = index
+        elif start is not None:
+            spans.append((start, index))
+            start = None
+    if start is not None:
+        spans.append((start, len(sentence)))
+    return spans
+
+
+def _valid_split_positions(word: str) -> list[int]:
+    """Return internal boundaries that do not separate a combining sequence."""
+    positions = []
+    for position in range(1, len(word)):
+        previous, following = word[position - 1], word[position]
+        # A vowel sign/other mark belongs to the preceding base letter. A
+        # virama (্) also must remain attached to the character before it.
+        if unicodedata.category(following).startswith("M") or previous == "\u09cd":
+            continue
+        positions.append(position)
+    return positions
+
+
+def split_word_error(sentence: str) -> str:
+    """Split one long Bangla word at a conservative morpheme/syllable boundary.
+
+    A random character boundary can break a conjunct or create implausible word
+    fragments.  Prefer familiar productive word-initial morphemes; otherwise,
+    permit only a boundary immediately after a Bangla vowel sign.  Both choices
+    are additionally checked to ensure no combining sequence is separated.
+    """
+    common_initial_morphemes = (
+        "বাংলা", "বিশ্ব", "শিক্ষা", "রাষ্ট্র", "দেশ", "বিদ্যা", "প্রতি",
+        "পরি", "সমাজ", "সরকার", "কর্ম", "জন", "আন্তর", "উপ",
+    )
+    candidates: list[tuple[int, list[int]]] = []
+
+    for start, end in _word_spans(sentence):
+        word = sentence[start:end]
+        if not _is_bangla_word(word) or len(word) < 5:
+            continue
+
+        safe_positions = set(_valid_split_positions(word))
+        morpheme_positions = [
+            len(morpheme)
+            for morpheme in common_initial_morphemes
+            if word.startswith(morpheme) and len(morpheme) in safe_positions
+        ]
+
+        # A vowel sign completes the preceding syllable, making the following
+        # base letter a conservative fallback split point.
+        syllable_positions = [
+            position
+            for position in safe_positions
+            if "BENGALI VOWEL SIGN" in unicodedata.name(word[position - 1], "")
+        ]
+        positions = morpheme_positions or syllable_positions
+        if positions:
+            candidates.append((start, positions))
+
+    if not candidates:
+        return sentence
+
+    start, positions = random.choice(candidates)
+    position = random.choice(positions)
+    return sentence[:start + position] + " " + sentence[start + position:]
+
+
+def run_on_error(sentence: str) -> str:
+    """Merge one eligible adjacent Bangla-word pair by removing one space."""
+    blocked_first_words = {
+        "করে", "করা", "হয়", "হবে", "ছিল", "ছিলেন", "আছে", "থেকে",
+        "সঙ্গে", "যায়", "দিয়ে", "নিয়ে",
+    }
+    candidates: list[tuple[int, int]] = []
+    spans = _word_spans(sentence)
+    for (left_start, left_end), (right_start, right_end) in zip(spans, spans[1:]):
+        first_word = sentence[left_start:left_end]
+        second_word = sentence[right_start:right_end]
+        separator = sentence[left_end:right_start]
+        first_letter_count = sum(
+            unicodedata.category(character).startswith("L") for character in first_word
+        )
+        second_letter_count = sum(
+            unicodedata.category(character).startswith("L") for character in second_word
+        )
+        # A literal one-space separator ensures punctuation, tabs, and repeated
+        # whitespace cannot be consumed by the run-on transformation.
+        if (
+            separator == " "
+            and first_word not in blocked_first_words
+            and first_letter_count >= 2
+            and second_letter_count >= 2
+        ):
+            candidates.append((left_end, right_start))
+
+    if not candidates:
+        return sentence
+
+    left_end, right_start = random.choice(candidates)
+    return sentence[:left_end] + sentence[right_start:]
+
+
+def apply_error(sentence: str, error_type: str) -> str:
+    """Apply one named error pattern, or return the input for an unknown type."""
+    error_functions = {
+        "phonetic": phonetic_error,
+        "visual": visual_error,
+        "keyboard": keyboard_error,
+        "split": split_word_error,
+        "run_on": run_on_error,
+    }
+    error_function = error_functions.get(error_type)
+    return error_function(sentence) if error_function else sentence
+
+
+if __name__ == "__main__":
+    # Make the demonstration reliable when launched from legacy Windows shells.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    sample_sentence = "শিক্ষার্থীরা আজ বাংলাদেশে এসেছে।"
+    print(f"Phonetic : {phonetic_error(sample_sentence)}")
+    print(f"Visual : {visual_error(sample_sentence)}")
+    print(f"Keyboard : {keyboard_error(sample_sentence)}")
+    print(f"Split : {split_word_error(sample_sentence)}")
+    print(f"Run-on : {run_on_error(sample_sentence)}")

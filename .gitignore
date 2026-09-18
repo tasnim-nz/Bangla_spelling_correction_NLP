@@ -58,8 +58,12 @@ venv.bak/
 !data/raw/*.txt
 !data/processed/*.txt
 !data/splits/*.txt
+!data/noisy/*.txt
+!data/noisy/*.csv
 !resources/*.txt
 !resources/*.csv
+!resources/*.json
+
 
 # But keep example/config files
 !requirements.txt
